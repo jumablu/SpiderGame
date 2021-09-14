@@ -35,9 +35,8 @@ public class IKFootSolver : MonoBehaviour
     public bool makingStep;
 
     // Raycast variables
-    Vector3 rayOffset;
-    Vector3 rayOrigin;
-    Vector3 rayDirection;
+    Vector3[] rayOrigin;
+    Vector3[] rayDirection;
 
     // Start is called before the first frame update
     void Start()
@@ -60,7 +59,12 @@ public class IKFootSolver : MonoBehaviour
 
         initialTorsoRotation = torso.rotation;
 
-        rayOffset = new Vector3(0, safeRadius, 0);
+        rayDirection = new Vector3[1];
+        rayDirection[0] = new Vector3(0, 0, 0);
+        //rayDirection[1] = new Vector3(0, 0, 0);
+        //rayDirection[2] = new Vector3(0, 0, 0);
+
+        rayOrigin = new Vector3[rayDirection.Length];
     }
 
     // Every calculated Position needs to be rotated when the torso rotates.
@@ -68,23 +72,8 @@ public class IKFootSolver : MonoBehaviour
     void Update()
     {
         // Leave foot on current position
-        transform.position = currentPosition;
+        //transform.position = currentPosition;
 
-        updateNewvalidPosition();
-
-        // Move leg if current pos leaves safe area
-        // safe area = max distance from idealPos
-        idlePosition = applyTorsoRotation(torso.position + idlePositionOffset);
-        idealPosition = applyTorsoRotation(torso.position + idealPositionOffset);
-        idealPosDistance = Vector3.Distance(idealPosition, currentPosition);
-        stepNeeded = !makingStep && (legIdle || idealPosDistance > safeRadius);
-        if (stepNeeded && stepAllowed)
-        {
-            updateLegPositions();
-            startFootAnimation();
-        }
-
-        animateFoot();
     }
 
     private void OnDrawGizmos()
@@ -92,7 +81,16 @@ public class IKFootSolver : MonoBehaviour
         // new Pos = red, safe area = green, ideal position = yellow
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(newValidPosition, 0.1f);
-        Debug.DrawRay(rayOrigin, rayDirection.normalized * 2 * safeRadius, Color.red);
+
+        // Draw all raycasts
+        if (rayDirection != null)
+        {
+            for (int i = 0; i < rayDirection.Length; i++)
+            {
+                Debug.DrawRay(rayOrigin[i], rayDirection[i].normalized * 2 * safeRadius, Color.red);
+                Gizmos.DrawSphere(rayOrigin[i], 0.1f);
+            }
+        }
 
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(idealPosition, safeRadius);
@@ -101,23 +99,68 @@ public class IKFootSolver : MonoBehaviour
         Gizmos.DrawWireSphere(idealPosition, 0.1f);
     }
 
-    private void updateNewvalidPosition()
+    public void updateNewValidPosition(Vector3 movementDirection)
     {
         // Raycast to detect if new ideal position is available
-        rayOrigin = applyTorsoRotation(torso.position + idealPositionOffset + rayOffset);
-        rayDirection = torso.TransformDirection(0, 0, -1);
-        rayOffset = new Vector3(0, safeRadius, 0);
-        Ray ray = new Ray(rayOrigin, rayDirection);
-        RaycastHit info;
-        newPosAvailable = Physics.Raycast(ray, out info, 2 * safeRadius, validFootPos);
+        // Multiple raycasts will be made and the closest one will be chosen
+        // All Raycasts are offset by 0.75*safeRadius in movement direction to step ahead
 
+        Vector3 movementDirectionOffset = movementDirection.normalized * 0.75f * safeRadius;
+
+        Ray[] ray = new Ray[rayDirection.Length];
+        RaycastHit[] info = new RaycastHit[rayDirection.Length];
+        bool[] rayCastHitGround = new bool[rayDirection.Length];
+        int closestIndex = -1;
+
+        newPosAvailable = false;
+
+        //rayDirection[0] = torso.up;
+        //rayDirection[1] = torso.right;
+        //rayDirection[2] = torso.forward;
+
+        //TODO
+        rayDirection[0] = -torso.forward;
+
+        for (int i = 0; i < rayDirection.Length; i++)
+        {
+            // Update Ray direction
+            // from torso through idealpos, two perpendicular to it
+            //TODO
+
+            // Calculate rayOrigin based on rayDirection and safeRadius
+            rayOrigin[i] = applyTorsoRotation(torso.position + idealPositionOffset + movementDirectionOffset) + -safeRadius * rayDirection[i];
+
+            ray[i] = new Ray(rayOrigin[i], rayDirection[i]);
+            rayCastHitGround[i] = Physics.Raycast(ray[i], out info[i], 2 * safeRadius, validFootPos);
+            newPosAvailable |= rayCastHitGround[i];
+
+            // Get raycast with smallest distance to origin
+            if (rayCastHitGround[i] && (closestIndex == -1 || info[i].distance < info[closestIndex].distance))
+            {
+                closestIndex = i;
+            }
+        }
+
+        // Update the newValidPosition if available
         if (newPosAvailable)
         {
-            newValidPosition = info.point;
+            newValidPosition = info[closestIndex].point;
         }
     }
 
-    private void updateLegPositions()
+    public void updateIdleIdeal()
+    {
+        idlePosition = applyTorsoRotation(torso.position + idlePositionOffset);
+        idealPosition = applyTorsoRotation(torso.position + idealPositionOffset);
+    }
+
+    public void updateStepNeeded()
+    {
+        idealPosDistance = Vector3.Distance(idealPosition, currentPosition);
+        stepNeeded = !makingStep && (legIdle || idealPosDistance > safeRadius);
+    }
+
+    public void updateLegPositions()
     {
         if (newPosAvailable)
         {
@@ -133,7 +176,7 @@ public class IKFootSolver : MonoBehaviour
         }
     }
 
-    private void startFootAnimation()
+    public void startFootAnimation()
     {
         // Start animation variables
         if (lerp >= 1 && (!makingStep && !legIdle))
@@ -146,7 +189,7 @@ public class IKFootSolver : MonoBehaviour
         }
     }
 
-    private void animateFoot()
+    public void animateFoot()
     {
         // if leg already in idle position update transform to stay near torso
         if (!makingStep && legIdle)
@@ -172,6 +215,8 @@ public class IKFootSolver : MonoBehaviour
             oldPosition = newPosition;
             makingStep = false;
         }
+
+        transform.position = currentPosition;
     }
 
     // Rotate point around the current torso rotation and then around
@@ -180,6 +225,13 @@ public class IKFootSolver : MonoBehaviour
     {
         point = rotateAroundPivot(point, torso.position, Quaternion.Inverse(initialTorsoRotation));
         point = rotateAroundPivot(point, torso.position, torso.rotation);
+        return point;
+    }
+
+    private Vector3 applyTorsoRotationAroundIdealPos(Vector3 point)
+    {
+        point = rotateAroundPivot(point, idealPosition, Quaternion.Inverse(initialTorsoRotation));
+        point = rotateAroundPivot(point, idealPosition, torso.rotation);
         return point;
     }
 
