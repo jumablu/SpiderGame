@@ -19,10 +19,10 @@ public class IKFootSolver : MonoBehaviour
     Vector3 oldPosition;
     Vector3 currentPosition;
     Vector3 newPosition;
-    Vector3 newValidPosition;
-    bool newPosAvailable;
+    public Vector3 newValidPosition;
+    public bool newPosAvailable;
     Vector3 idealPositionOffset;
-    Vector3 idealPosition;
+    public Vector3 idealPosition;
     public float idealPosDistance;
     Vector3 idlePositionOffset;
     Vector3 idlePosition;

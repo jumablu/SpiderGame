@@ -786,12 +786,12 @@ MonoBehaviour:
   rotationSpeed: 2
   maxStepCount: 2
   IKController:
-  - {fileID: 252403266}
-  - {fileID: 266558629}
   - {fileID: 1229090481}
   - {fileID: 1175784111}
   - {fileID: 49432580}
   - {fileID: 1490637059}
+  - {fileID: 252403266}
+  - {fileID: 266558629}
   torso: {fileID: 381281306}
   validFootPos:
     serializedVersion: 2

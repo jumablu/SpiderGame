@@ -10,16 +10,14 @@ public class PlayerMovement : MonoBehaviour
     public float rotationSpeed;
     [Space(20)]
     public int maxStepCount;
+    [Tooltip("Controllers in order front to back with L R ")]
     public List<Transform> IKController;
     public Transform torso;
     [Space(20)]
     public LayerMask validFootPos;
 
     List<IKFootSolver> footSolver;
-    Ray[] ray;
-    RaycastHit[] rayInfo;
-    bool[] raycastHits;
-    Vector3 rayOffset;
+    float[] idealPosDist;
 
     // Start is called before the first frame update
     void Start()
@@ -31,10 +29,7 @@ public class PlayerMovement : MonoBehaviour
             footSolver.Add(solver);
         }
 
-        ray = new Ray[3];
-        rayInfo = new RaycastHit[ray.Length];
-        raycastHits = new bool[ray.Length];
-        rayOffset = new Vector3(0, 1, 0);
+        idealPosDist = new float[6];
     }
 
     // Update is called once per frame
@@ -46,7 +41,26 @@ public class PlayerMovement : MonoBehaviour
         float moveZ = Input.GetAxis("Vertical");
 
         // Position Body relative to objects
-        updateRaycasts();
+        // Get the difference of each idealPos to newPos (if available else 0) and average them to a rotation
+        idealPosDist = new float[6];
+
+        for (int i = 0; i < 6; i++)
+        {
+            if (footSolver[i].newPosAvailable)
+            {
+                idealPosDist[i] = Vector3.Distance(footSolver[i].idealPosition, footSolver[i].newValidPosition);
+                
+                // If newPos below ideal pos (greater distance from torso) it should be negative
+                if (Vector3.Distance(footSolver[i].newValidPosition, torso.position) > Vector3.Distance(footSolver[i].idealPosition, torso.position))
+                {
+                    idealPosDist[i] *= -1;
+                }
+            }
+            else
+            {
+                idealPosDist[i] = 0;
+            }
+        }
 
         // Ground distance should always be 0 because pivot is on null level
         float moveY = getYMovement();
@@ -56,9 +70,10 @@ public class PlayerMovement : MonoBehaviour
 
         transform.Translate(movement);
 
-        // Rotate Player around Y axis
-        float rotateY = Input.GetAxis("Mouse X");
-        transform.Rotate(0, rotateY * rotationSpeed * 100 * Time.deltaTime, 0);
+        // Get X and Z rotation from legs raycasts, Y rotation from mouse
+        Vector3 rotatePlayer = getPlayerRotation();
+
+        transform.Rotate(rotatePlayer);
 
         // TODO Rotate player relative to objects
 
@@ -107,57 +122,61 @@ public class PlayerMovement : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        try
-        {
-            for (int i = 0; i < ray.Length; i++)
-            {
-                Debug.DrawRay(ray[i].origin, ray[i].direction.normalized * 1.5f * rayOffset.magnitude, Color.red);
-            }
-        }
-        catch (NullReferenceException) { }
+        
     }
 
-    void updateRaycasts()
+    Vector3 getPlayerRotation()
     {
-        // Positions Player relative to ground
-        // three raycasts (front middle and back) f and b are diagonal
-        // ALL TODO
+        // This Function rotates the player using the footpositions
+        // Correct IKFootSolver order is assumed (see Tooltip)
 
-        ray[0] = new Ray(transform.position + rayOffset, -transform.up);
-        ray[1] = new Ray(rayOffset + transform.TransformPoint(0, 0, 1.5f), -transform.up + transform.forward);
-        ray[2] = new Ray(rayOffset + transform.TransformPoint(0, 0, -1), -transform.up - transform.forward);
+        // Player mouse rotation
+        float rotateY = Input.GetAxis("Mouse X") * rotationSpeed * 150 * Time.deltaTime;
 
-        for(int i = 0; i < ray.Length; i++)
+        // Z Rotation (average L and R and get difference)
+        float avgL = 0;
+        float avgR = 0;
+
+        for (int i = 0; i < 6; i++)
         {
-            raycastHits[i] = Physics.Raycast(ray[i], out rayInfo[i], 1.5f * rayOffset.magnitude, validFootPos);
+            if (i % 2 == 0)
+            {
+                avgL += idealPosDist[i];
+            }
+            else
+            {
+                avgR += idealPosDist[i];
+            }
         }
+
+        avgL /= 3;
+        avgR /= 3;
+
+        Debug.Log("LR " + (avgL - avgR));
+
+        // X Rotation (average front and back and get difference)
+        float avgF = (idealPosDist[0] + idealPosDist[1]) / 2;
+        float avgB = (idealPosDist[4] + idealPosDist[5]) / 2;
+
+        Debug.Log("FB " + (avgF - avgB));
+
+
+        Vector3 playerRotation = new Vector3(avgB - avgF, rotateY, avgR - avgL);
+        return playerRotation;
     }
 
     float getYMovement()
     {
-        // This function should be called after updateRaycasts()
-        // Positions player relative to ground using average of the raycasthits
-        Vector3 average = new Vector3(0, 0, 0);
-        int hitCount = 0;
+        float avg = 0;
 
-        for(int i = 0; i < rayInfo.Length; i++)
+        foreach (float dist in idealPosDist)
         {
-            if (raycastHits[i])
-            {
-                average += rayInfo[i].point;
-                hitCount++;
-            }
+            
+            avg += dist;
         }
 
-        if (hitCount != 0)
-        {
-            average /= hitCount;
-        }
-
-        Debug.Log(-(transform.position - average).y);
-
-        // Get y distance from spiderpos to average
-        return -(transform.position - average).y;
+        avg /= 6;
+        return avg;
     }
 
     static int SortByDistance (IKFootSolver fs1, IKFootSolver fs2)
