@@ -10,31 +10,72 @@ public class PlayerMovement : MonoBehaviour
     public float rotationSpeed;
     [Space(20)]
     public int maxStepCount;
-    [Tooltip("Controllers in order front to back with L R ")]
-    public List<Transform> IKController;
+    public float moveDuration;
+    [Space(20)]
+    [Header("Controllers in order front to back with L R alternating")]
+    public Transform[] IKController = new Transform[6];
     public Transform torso;
     [Space(20)]
     public LayerMask validFootPos;
 
-    List<IKFootSolver> footSolver;
-    float[] idealPosDist;
+    IKFootSolver[] footSolver;
+    bool falling;
 
     // Start is called before the first frame update
     void Start()
     {
-        footSolver = new List<IKFootSolver>();
-        foreach(Transform controller in IKController)
+        footSolver = new IKFootSolver[6];
+        for (int i = 0; i < IKController.Length; i++)
         {
-            IKFootSolver solver = controller.GetComponent<IKFootSolver>();
-            footSolver.Add(solver);
+            // Get footSolver components
+            footSolver[i] = IKController[i].GetComponent<IKFootSolver>();
+
+            // Set IK target position to default
+            IKController[i].position = footSolver[i].tipLeg.position;
         }
 
-        idealPosDist = new float[6];
+        falling = false;
     }
 
     // Update is called once per frame
     void Update()
     {
+        // Update if player falling
+        if (!falling)
+        {
+            // Check if player in RigidBody mode
+            int legIdleCount = 0;
+
+            for (int i = 0; i < footSolver.Length; i++)
+            {
+                if (!footSolver[i].newPosAvailable)
+                {
+                    legIdleCount++;
+                }
+            }
+
+            if (legIdleCount > 4)
+            {
+                // TODO: enable Rigidbody, disable player movement, set legs idle, !check if on ground again!
+                falling = true;
+            }
+        }
+        
+        // If not falling movement logic
+        if (!falling)
+        {
+
+        }
+
+
+
+
+
+
+
+
+
+        // OLD--------------------------------------------------------------------------------------------------
         // <---------- Move Player ---------->
         // X Z plane movement
         float moveX = Input.GetAxis("Horizontal");
@@ -42,25 +83,7 @@ public class PlayerMovement : MonoBehaviour
 
         // Position Body relative to objects
         // Get the difference of each idealPos to newPos (if available else 0) and average them to a rotation
-        idealPosDist = new float[6];
-
-        for (int i = 0; i < 6; i++)
-        {
-            if (footSolver[i].newPosAvailable)
-            {
-                idealPosDist[i] = Vector3.Distance(footSolver[i].idealPosition, footSolver[i].newValidPosition);
-                
-                // If newPos below ideal pos (greater distance from torso) it should be negative
-                if (Vector3.Distance(footSolver[i].newValidPosition, torso.position) > Vector3.Distance(footSolver[i].idealPosition, torso.position))
-                {
-                    idealPosDist[i] *= -1;
-                }
-            }
-            else
-            {
-                idealPosDist[i] = 0;
-            }
-        }
+        
 
         // Ground distance should always be 0 because pivot is on null level
         float moveY = getYMovement();
@@ -89,7 +112,8 @@ public class PlayerMovement : MonoBehaviour
         {
             solver.animateFoot();
 
-            solver.updateNewValidPosition(movement);
+            // Pass X and Z direction movement to footsolver for raycast offset in step direction
+            solver.updateNewValidPosition(new Vector3(movement.x, 0, movement.z));
             
             solver.updateIdleIdeal();
             solver.updateStepNeeded();
@@ -133,35 +157,10 @@ public class PlayerMovement : MonoBehaviour
         // Player mouse rotation
         float rotateY = Input.GetAxis("Mouse X") * rotationSpeed * 150 * Time.deltaTime;
 
-        // Z Rotation (average L and R and get difference)
-        float avgL = 0;
-        float avgR = 0;
-
-        for (int i = 0; i < 6; i++)
-        {
-            if (i % 2 == 0)
-            {
-                avgL += idealPosDist[i];
-            }
-            else
-            {
-                avgR += idealPosDist[i];
-            }
-        }
-
-        avgL /= 3;
-        avgR /= 3;
-
-        Debug.Log("LR " + (avgL - avgR));
-
-        // X Rotation (average front and back and get difference)
-        float avgF = (idealPosDist[0] + idealPosDist[1]) / 2;
-        float avgB = (idealPosDist[4] + idealPosDist[5]) / 2;
-
-        Debug.Log("FB " + (avgF - avgB));
+        // X and Z rotation based on average normal vector of validNewPos
 
 
-        Vector3 playerRotation = new Vector3(avgB - avgF, rotateY, avgR - avgL);
+        Vector3 playerRotation = new Vector3(0, rotateY, 0);
         return playerRotation;
     }
 
@@ -169,10 +168,10 @@ public class PlayerMovement : MonoBehaviour
     {
         float avg = 0;
 
-        foreach (float dist in idealPosDist)
+        //foreach (float dist in idealPosDist)
         {
             
-            avg += dist;
+            //avg += dist;
         }
 
         avg /= 6;

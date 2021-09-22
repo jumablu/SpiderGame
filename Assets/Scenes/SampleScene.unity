@@ -123,6 +123,11 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!4 &44053333 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4791122696887320332, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+  m_PrefabInstance: {fileID: 566222731}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &49432580 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5599410326845563478, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
@@ -430,6 +435,11 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!4 &527982749 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6841118600153190661, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+  m_PrefabInstance: {fileID: 566222731}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &566222731
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -486,6 +496,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5599410325211395473, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+      propertyPath: tipLeg
+      value: 
+      objectReference: {fileID: 1077622955}
+    - target: {fileID: 5599410325211395473, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
       propertyPath: stepSpeed
       value: 10
       objectReference: {fileID: 0}
@@ -498,6 +512,10 @@ PrefabInstance:
       value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 5599410325252975799, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+      propertyPath: tipLeg
+      value: 
+      objectReference: {fileID: 986368238}
+    - target: {fileID: 5599410325252975799, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
@@ -514,6 +532,10 @@ PrefabInstance:
       value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 5599410325288464744, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+      propertyPath: tipLeg
+      value: 
+      objectReference: {fileID: 1730759709}
+    - target: {fileID: 5599410325288464744, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
@@ -530,6 +552,10 @@ PrefabInstance:
       value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 5599410325573765681, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+      propertyPath: tipLeg
+      value: 
+      objectReference: {fileID: 44053333}
+    - target: {fileID: 5599410325573765681, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
@@ -546,6 +572,10 @@ PrefabInstance:
       value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 5599410326845563481, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+      propertyPath: tipLeg
+      value: 
+      objectReference: {fileID: 2058650673}
+    - target: {fileID: 5599410326845563481, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
@@ -561,6 +591,10 @@ PrefabInstance:
       propertyPath: stepHeight
       value: 0.5
       objectReference: {fileID: 0}
+    - target: {fileID: 5599410326922638930, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+      propertyPath: tipLeg
+      value: 
+      objectReference: {fileID: 527982749}
     - target: {fileID: 5599410326922638930, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
       propertyPath: m_Enabled
       value: 1
@@ -755,6 +789,16 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
+--- !u!4 &986368238 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7203308107237031876, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+  m_PrefabInstance: {fileID: 566222731}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1077622955 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7753865899813347752, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+  m_PrefabInstance: {fileID: 566222731}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1175784111 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5599410325252975796, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
@@ -785,6 +829,7 @@ MonoBehaviour:
   movementSpeed: 5
   rotationSpeed: 2
   maxStepCount: 2
+  moveDuration: 0
   IKController:
   - {fileID: 1229090481}
   - {fileID: 1175784111}
@@ -799,5 +844,15 @@ MonoBehaviour:
 --- !u!4 &1490637059 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5599410325288464745, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+  m_PrefabInstance: {fileID: 566222731}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1730759709 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 2678283380446007138, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
+  m_PrefabInstance: {fileID: 566222731}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &2058650673 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3799392078189053511, guid: 78f471257e18a0248a59dddd81adb8f4, type: 3}
   m_PrefabInstance: {fileID: 566222731}
   m_PrefabAsset: {fileID: 0}

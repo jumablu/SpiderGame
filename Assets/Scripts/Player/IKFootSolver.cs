@@ -4,11 +4,9 @@ using UnityEngine;
 
 public class IKFootSolver : MonoBehaviour
 {
-    public Transform spider;
-    public Transform root;
-    public Transform torso;
     public Transform upperLeg;
     public Transform lowerLeg;
+    public Transform tipLeg;
     public float safeRadius;
     public float stepHeight;
     public float stepSpeed;
@@ -52,12 +50,12 @@ public class IKFootSolver : MonoBehaviour
         stepAllowed = false;
         makingStep = false;
 
-        idealPositionOffset = transform.position - torso.position;
+        //idealPositionOffset = transform.position - torso.position;
         idealPosDistance = 0;
         idlePositionOffset = idealPositionOffset / 2;
         legIdle = false;
 
-        initialTorsoRotation = torso.rotation;
+        //initialTorsoRotation = torso.rotation;
 
         rayDirection = new Vector3[1];
         rayDirection[0] = new Vector3(0, 0, 0);
@@ -119,7 +117,7 @@ public class IKFootSolver : MonoBehaviour
         //rayDirection[2] = torso.forward;
 
         //TODO
-        rayDirection[0] = -torso.forward;
+        //rayDirection[0] = -torso.forward;
 
         for (int i = 0; i < rayDirection.Length; i++)
         {
@@ -128,7 +126,7 @@ public class IKFootSolver : MonoBehaviour
             //TODO
 
             // Calculate rayOrigin based on rayDirection and safeRadius
-            rayOrigin[i] = applyTorsoRotation(torso.position + idealPositionOffset + movementDirectionOffset) + -safeRadius * rayDirection[i];
+            //rayOrigin[i] = applyTorsoRotation(torso.position + idealPositionOffset + movementDirectionOffset) + -safeRadius * rayDirection[i];
 
             ray[i] = new Ray(rayOrigin[i], rayDirection[i]);
             rayCastHitGround[i] = Physics.Raycast(ray[i], out info[i], 2 * safeRadius, validFootPos);
@@ -150,8 +148,8 @@ public class IKFootSolver : MonoBehaviour
 
     public void updateIdleIdeal()
     {
-        idlePosition = applyTorsoRotation(torso.position + idlePositionOffset);
-        idealPosition = applyTorsoRotation(torso.position + idealPositionOffset);
+        //idlePosition = applyTorsoRotation(torso.position + idlePositionOffset);
+        //idealPosition = applyTorsoRotation(torso.position + idealPositionOffset);
     }
 
     public void updateStepNeeded()
@@ -223,15 +221,15 @@ public class IKFootSolver : MonoBehaviour
     // the inverse initial rotation to get the difference.
     private Vector3 applyTorsoRotation(Vector3 point)
     {
-        point = rotateAroundPivot(point, torso.position, Quaternion.Inverse(initialTorsoRotation));
-        point = rotateAroundPivot(point, torso.position, torso.rotation);
+        //point = rotateAroundPivot(point, torso.position, Quaternion.Inverse(initialTorsoRotation));
+        //point = rotateAroundPivot(point, torso.position, torso.rotation);
         return point;
     }
 
     private Vector3 applyTorsoRotationAroundIdealPos(Vector3 point)
     {
         point = rotateAroundPivot(point, idealPosition, Quaternion.Inverse(initialTorsoRotation));
-        point = rotateAroundPivot(point, idealPosition, torso.rotation);
+        //point = rotateAroundPivot(point, idealPosition, torso.rotation);
         return point;
     }
 
