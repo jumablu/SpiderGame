@@ -2,6 +2,20 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+/* 
+ * This class is attatched to a spider ragdoll mesh with rig.
+ * It is used to controll the movement of the foot targets linkes via a 
+ * fixed joint in order to move the player.
+ * 
+ * TODO:
+ * - Move and rotate the targetController according to ground.
+ * - Rotate rayasts with targetController correctly.
+ * 
+ * Current workarounds:
+ * -variable float[] idealPosDist is made ststic for sorting. This could 
+ * lead to issues if there is more than one GameObject with the 
+ * PlayerRagdollMovement script attatched.
+ * */
 public class PlayerRagdollMovement : MonoBehaviour
 {
     // ** public variables **
@@ -10,6 +24,8 @@ public class PlayerRagdollMovement : MonoBehaviour
     [Space(20)]
     public float maxFootDist;
     public float animationSpeed;
+    public float stepHeight;
+    public int maxStepAllowed;
     public LayerMask validFootPos;
     [Space(20)]
     public Transform targetController;
@@ -23,16 +39,25 @@ public class PlayerRagdollMovement : MonoBehaviour
     public Transform torso;
 
     // ** private variables **
+    // foot position & calculation
     Transform[] target;
     Vector3[] idealPosOffset;
     Vector3[] idealPos;
+    static float[] idealPosDist;
     bool[] newPosAvailable;
     Vector3[] newValidPos;
     Vector3[] currentPos;
 
+    // raycast variables
     Vector3[] rayDirection;
     Vector3[] rayOrigin;
     RaycastHit[] rayHit;
+
+    // animation variables
+    bool[] footMoving;
+    float[] lerp;
+    Vector3[] oldPos;
+    Vector3[] newPos;
 
     // Start is called before the first frame update
     void Start()
@@ -58,19 +83,31 @@ public class PlayerRagdollMovement : MonoBehaviour
             currentPos[i] = target[i].position;
         }
 
-        // rest
+        // foot position & calculation rest
         idealPos = new Vector3[target.Length];
+        idealPosDist = new float[target.Length];
         newPosAvailable = new bool[target.Length];
         newValidPos = new Vector3[target.Length];
+
+        // raycast variables
         rayDirection = new Vector3[target.Length];
         rayOrigin = new Vector3[target.Length];
         rayHit = new RaycastHit[target.Length];
+
+        // animation variables
+        footMoving = new bool[target.Length];
+        lerp = new float[target.Length];
+        oldPos = new Vector3[target.Length];
+        newPos = new Vector3[target.Length];
     }
 
     // Update is called once per frame
     void Update()
     {
-        // ** Update newValidPos and determine which feet want to move **
+        // ** Update newValidPos, determine which feet need to move and count feet currently moving **
+        List<int> stepNeededIndex = new List<int>();
+        int feetCurrentlyMoving = 0;
+
         for (int i = 0; i < target.Length; i++)
         {
             // Update idealPos
@@ -88,14 +125,74 @@ public class PlayerRagdollMovement : MonoBehaviour
                 newValidPos[i] = rayHit[i].point;
             }
 
+            // Update if foot needs to step
+            idealPosDist[i] = Vector3.Distance(currentPos[i], idealPos[i]);
+            if (idealPosDist[i] > maxFootDist && !footMoving[i])
+            {
+                stepNeededIndex.Add(i);
+            }
 
-
-
+            // Count the number of feet currently moving
+            if (footMoving[i])
+            {
+                feetCurrentlyMoving++;
+            }
         }
 
         // ** determine which feet can move **
-        // ** calculate currentpos for animation **
-        // ** set currentpos for feet **
+        List<int> stepAllowedIndex = new List<int>();
+        if (stepNeededIndex.Count > maxStepAllowed - feetCurrentlyMoving)
+        {
+            // First move feet that are furthest from their idealPos -> Sort by distance descending
+            stepNeededIndex.Sort(SortIndexByDistance);
+            stepNeededIndex.Reverse();
+            
+            for (int i = 0; i < maxStepAllowed - feetCurrentlyMoving; i++)
+            {
+                stepAllowedIndex.Add(stepNeededIndex[i]);
+            }
+        }
+        else
+        {
+            stepAllowedIndex = stepNeededIndex;
+        }
+
+        // ** initialize animation variables **
+        // set oldPos, newPos, lerp (linear interpolation), and the state of moving
+        foreach (int i in stepAllowedIndex)
+        {
+            oldPos[i] = currentPos[i];
+            newPos[i] = newValidPos[i];
+            lerp[i] = 0;
+            footMoving[i] = true;
+        }
+
+        // ** Update currentPos and move feet to currentPos **
+        for (int i = 0; i < target.Length; i++)
+        {
+            if (footMoving[i])
+            {
+                // Update currentPos
+                currentPos[i] = Vector3.Lerp(oldPos[i], newPos[i], lerp[i]);
+                currentPos[i] += targetController.TransformDirection(new Vector3(0, Mathf.Sin(lerp[i] * Mathf.PI) * stepHeight, 0));
+
+                // increment lerp
+                lerp[i] += Time.deltaTime * animationSpeed;
+
+                // Check if step ended
+                if (lerp[i] >= 1)
+                {
+                    footMoving[i] = false;
+                }
+            }
+
+            target[i].position = currentPos[i];
+        }
+
+
+        // -- DEBUGGING --
+        
+        // -- DEBUGGING END ---
     }
 
     private void OnDrawGizmos()
@@ -115,5 +212,10 @@ public class PlayerRagdollMovement : MonoBehaviour
                 Gizmos.DrawWireSphere(idealPos[i], maxFootDist);
             }
         }
+    }
+
+    static int SortIndexByDistance(int i1, int i2)
+    {
+        return idealPosDist[i1].CompareTo(idealPosDist[i2]);
     }
 }
