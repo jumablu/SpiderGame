@@ -9,7 +9,8 @@ using UnityEngine;
  * 
  * TODO:
  * - Move and rotate the targetController according to ground.
- * - Rotate rayasts with targetController correctly.
+ * - Handle Legs in air / without newValidPos.
+ * - handle multiple raycasts.
  * 
  * Current workarounds:
  * -variable float[] idealPosDist is made ststic for sorting. This could 
@@ -25,6 +26,7 @@ public class PlayerRagdollMovement : MonoBehaviour
     public float maxFootDist;
     public float animationSpeed;
     public float stepHeight;
+    public float stepTilt;
     public int maxStepAllowed;
     public LayerMask validFootPos;
     [Space(20)]
@@ -58,6 +60,10 @@ public class PlayerRagdollMovement : MonoBehaviour
     float[] lerp;
     Vector3[] oldPos;
     Vector3[] newPos;
+
+    // -- DEBUG VARIABLES --
+    Vector3 move;
+    // -- DEBUG VARIABLES END --
 
     // Start is called before the first frame update
     void Start()
@@ -99,11 +105,16 @@ public class PlayerRagdollMovement : MonoBehaviour
         lerp = new float[target.Length];
         oldPos = new Vector3[target.Length];
         newPos = new Vector3[target.Length];
+
+        // -- DEBUG INIT --
+        move = new Vector3(0, 0, -1.5f);
+        // -- DEBUG INIT END --
     }
 
     // Update is called once per frame
     void Update()
     {
+        // ---------- Calculate leg positions / animations ----------
         // ** Update newValidPos, determine which feet need to move and count feet currently moving **
         List<int> stepNeededIndex = new List<int>();
         int feetCurrentlyMoving = 0;
@@ -111,10 +122,11 @@ public class PlayerRagdollMovement : MonoBehaviour
         for (int i = 0; i < target.Length; i++)
         {
             // Update idealPos
-            idealPos[i] = targetController.position + idealPosOffset[i];
+            idealPos[i] = targetController.position + targetController.TransformDirection(idealPosOffset[i]);
 
             // Raycasts to detect new Position
             rayDirection[i] = targetController.TransformDirection(0, -1, 0);
+
             rayOrigin[i] = idealPos[i] - maxFootDist * rayDirection[i];
 
             Ray ray = new Ray(rayOrigin[i], rayDirection[i]);
@@ -157,14 +169,18 @@ public class PlayerRagdollMovement : MonoBehaviour
             stepAllowedIndex = stepNeededIndex;
         }
 
-        // ** initialize animation variables **
-        // set oldPos, newPos, lerp (linear interpolation), and the state of moving
+        // ** Start foot movement (animation or ragdoll) **
         foreach (int i in stepAllowedIndex)
         {
-            oldPos[i] = currentPos[i];
-            newPos[i] = newValidPos[i];
-            lerp[i] = 0;
-            footMoving[i] = true;
+            // Start animation if newPosAvailable
+            if (newPosAvailable[i])
+            {
+                // set oldPos, newPos, lerp (linear interpolation), and the state of moving
+                oldPos[i] = currentPos[i];
+                newPos[i] = newValidPos[i];
+                lerp[i] = 0;
+                footMoving[i] = true;
+            }
         }
 
         // ** Update currentPos and move feet to currentPos **
@@ -190,8 +206,41 @@ public class PlayerRagdollMovement : MonoBehaviour
         }
 
 
+        // ---------- Move & rotate IK Controller / player ----------
+        // ** Movement **
+        // get X Z plane movement
+        float moveX = Input.GetAxis("Horizontal") * movementSpeed;
+        float moveZ = Input.GetAxis("Vertical") * movementSpeed;
+
+        // Apply transforms
+        Vector3 movement = new Vector3(moveX, 0, moveZ) * Time.deltaTime;
+        targetController.Translate(movement);
+
+        // ** Rotation **
+        // Y rotation via mouse input
+        float rotateY = Input.GetAxis("Mouse X") * rotationSpeed;
+
+        // X and Z rotation from average normal vector of raycasts
+        Vector3 avgNormal = new Vector3(0, 0, 0);
+        int rayHitCount = 0;
+
+        for (int i = 0; i < target.Length; i++)
+        {
+            if (newPosAvailable[i])
+            {
+                rayHitCount++;
+                avgNormal += rayHit[i].normal;
+            }
+        }
+
+        avgNormal /= rayHitCount;
+
+        // Apply rotation
+        Vector3 rotate = new Vector3(0, rotateY, 0);
+        targetController.Rotate(rotate);
+
         // -- DEBUGGING --
-        
+        Debug.Log(avgNormal);
         // -- DEBUGGING END ---
     }
 
@@ -206,6 +255,7 @@ public class PlayerRagdollMovement : MonoBehaviour
 
                 Gizmos.color = Color.red;
                 Gizmos.DrawWireSphere(newValidPos[i], 0.1f);
+                Gizmos.DrawSphere(rayOrigin[i], 0.02f);
                 Debug.DrawRay(rayOrigin[i], rayDirection[i] * 2 * maxFootDist, Color.red);
 
                 Gizmos.color = Color.green;
