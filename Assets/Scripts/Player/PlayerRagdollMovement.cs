@@ -38,7 +38,9 @@ public class PlayerRagdollMovement : MonoBehaviour
     public Transform IKTargetMiddleL;
     public Transform IKTargetMiddleR;
     [Space(20)]
+    public Transform head;
     public Transform torso;
+    public Transform tailEnd;
 
     // ** private variables **
     // foot position & calculation
@@ -50,10 +52,15 @@ public class PlayerRagdollMovement : MonoBehaviour
     Vector3[] newValidPos;
     Vector3[] currentPos;
 
-    // raycast variables
+    // foot raycast variables
     Vector3[] rayDirection;
     Vector3[] rayOrigin;
     RaycastHit[] rayHit;
+
+    // Controller movement raycast variables
+    Ray[] moveYRay;
+    RaycastHit[] moveYRayHit;
+    Vector3 moveYRayDir;
 
     // animation variables
     bool[] footMoving;
@@ -62,7 +69,6 @@ public class PlayerRagdollMovement : MonoBehaviour
     Vector3[] newPos;
 
     // -- DEBUG VARIABLES --
-    Vector3 move;
     // -- DEBUG VARIABLES END --
 
     // Start is called before the first frame update
@@ -100,6 +106,11 @@ public class PlayerRagdollMovement : MonoBehaviour
         rayOrigin = new Vector3[target.Length];
         rayHit = new RaycastHit[target.Length];
 
+        // Controller movement raycast variables
+        moveYRay = new Ray[3];
+        moveYRayHit = new RaycastHit[3];
+        moveYRayDir = new Vector3();
+
         // animation variables
         footMoving = new bool[target.Length];
         lerp = new float[target.Length];
@@ -107,7 +118,6 @@ public class PlayerRagdollMovement : MonoBehaviour
         newPos = new Vector3[target.Length];
 
         // -- DEBUG INIT --
-        move = new Vector3(0, 0, -1.5f);
         // -- DEBUG INIT END --
     }
 
@@ -158,7 +168,7 @@ public class PlayerRagdollMovement : MonoBehaviour
             // First move feet that are furthest from their idealPos -> Sort by distance descending
             stepNeededIndex.Sort(SortIndexByDistance);
             stepNeededIndex.Reverse();
-            
+
             for (int i = 0; i < maxStepAllowed - feetCurrentlyMoving; i++)
             {
                 stepAllowedIndex.Add(stepNeededIndex[i]);
@@ -212,8 +222,40 @@ public class PlayerRagdollMovement : MonoBehaviour
         float moveX = Input.GetAxis("Horizontal") * movementSpeed;
         float moveZ = Input.GetAxis("Vertical") * movementSpeed;
 
+        // get Y movement, avg of raycast from head, torso, tailEnd
+        float moveY = 0;
+        int rayHitCount = 0;
+
+        moveYRay = new Ray[3];
+        moveYRayHit = new RaycastHit[3];
+
+        moveYRayDir = targetController.TransformDirection(0, -1, 0);
+        moveYRay[0] = new Ray(head.position, moveYRayDir);
+        moveYRay[0] = new Ray(torso.position, moveYRayDir);
+        moveYRay[0] = new Ray(tailEnd.position, moveYRayDir);
+
+        for (int i = 0; i < moveYRay.Length; i++)
+        {
+            if (Physics.Raycast(moveYRay[i], out moveYRayHit[i], 2 * maxFootDist, validFootPos))
+            {
+                rayHitCount++;
+                moveY += moveYRayHit[i].distance;
+            }
+        }
+
+        if (rayHitCount > 0)
+        {
+            moveY /= rayHitCount;
+            moveY -= maxFootDist;
+            moveY -= targetController.position.y;
+        }
+        else
+        {
+            moveY = 0;
+        }
+
         // Apply transforms
-        Vector3 movement = new Vector3(moveX, 0, moveZ) * Time.deltaTime;
+        Vector3 movement = new Vector3(moveX, moveY, moveZ) * Time.deltaTime;
         targetController.Translate(movement);
 
         // ** Rotation **
@@ -222,7 +264,7 @@ public class PlayerRagdollMovement : MonoBehaviour
 
         // X and Z rotation from average normal vector of raycasts
         Vector3 avgNormal = new Vector3(0, 0, 0);
-        int rayHitCount = 0;
+        rayHitCount = 0;
 
         for (int i = 0; i < target.Length; i++)
         {
@@ -240,26 +282,40 @@ public class PlayerRagdollMovement : MonoBehaviour
         targetController.Rotate(rotate);
 
         // -- DEBUGGING --
-        Debug.Log(avgNormal);
+
         // -- DEBUGGING END ---
     }
 
     private void OnDrawGizmos()
     {
-        if (idealPosOffset != null)
+        if (idealPosOffset != null && idealPosOffset.Length != 0)
         {
             for (int i = 0; i < target.Length; i++)
             {
+                // idealPos
                 Gizmos.color = Color.yellow;
                 Gizmos.DrawWireSphere(idealPos[i], 0.01f);
 
+                // leg Raycast
                 Gizmos.color = Color.red;
                 Gizmos.DrawWireSphere(newValidPos[i], 0.1f);
                 Gizmos.DrawSphere(rayOrigin[i], 0.02f);
                 Debug.DrawRay(rayOrigin[i], rayDirection[i] * 2 * maxFootDist, Color.red);
 
+                // leg validpos
                 Gizmos.color = Color.green;
                 Gizmos.DrawWireSphere(idealPos[i], maxFootDist);
+            }
+
+            // targetController raycasts
+            Gizmos.color = Color.magenta;
+            Debug.DrawRay(head.position, moveYRayDir.normalized * 2 * maxFootDist, Color.magenta);
+            Debug.DrawRay(torso.position, moveYRayDir.normalized * 2 * maxFootDist, Color.magenta);
+            Debug.DrawRay(tailEnd.position, moveYRayDir.normalized * 2 * maxFootDist, Color.magenta);
+
+            for (int i = 0; i < moveYRay.Length; i++)
+            {
+                Gizmos.DrawWireSphere(moveYRayHit[i].point, 0.1f);
             }
         }
     }
