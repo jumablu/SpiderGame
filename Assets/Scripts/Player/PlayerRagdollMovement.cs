@@ -29,6 +29,7 @@ public class PlayerRagdollMovement : MonoBehaviour
     public float stepTilt;
     public int maxStepAllowed;
     public LayerMask validFootPos;
+    public LayerMask playerBody;
     [Space(20)]
     public Transform targetController;
     public Transform IKTargetBackL;
@@ -60,7 +61,7 @@ public class PlayerRagdollMovement : MonoBehaviour
     // Controller movement raycast variables
     Ray[] moveYRay;
     RaycastHit[] moveYRayHit;
-    Vector3 moveYRayDir;
+    Vector3[] moveYRayDir;
 
     // animation variables
     bool[] footMoving;
@@ -109,7 +110,7 @@ public class PlayerRagdollMovement : MonoBehaviour
         // Controller movement raycast variables
         moveYRay = new Ray[3];
         moveYRayHit = new RaycastHit[3];
-        moveYRayDir = new Vector3();
+        moveYRayDir = new Vector3[3];
 
         // animation variables
         footMoving = new bool[target.Length];
@@ -226,17 +227,19 @@ public class PlayerRagdollMovement : MonoBehaviour
         float moveY = 0;
         int rayHitCount = 0;
 
-        moveYRay = new Ray[3];
-        moveYRayHit = new RaycastHit[3];
+        moveYRayDir[0] = targetController.TransformDirection(0, -1, 0) + targetController.TransformDirection(0, 0, 1);
+        moveYRayDir[0].Normalize();
+        moveYRayDir[1] = targetController.TransformDirection(0, -1, 0);
+        moveYRayDir[2] = targetController.TransformDirection(0, -1, 0) + targetController.TransformDirection(0, 0, -1);
+        moveYRayDir[2].Normalize();
 
-        moveYRayDir = targetController.TransformDirection(0, -1, 0);
-        moveYRay[0] = new Ray(head.position, moveYRayDir);
-        moveYRay[0] = new Ray(torso.position, moveYRayDir);
-        moveYRay[0] = new Ray(tailEnd.position, moveYRayDir);
+        moveYRay[0] = new Ray(head.position, moveYRayDir[0]);
+        moveYRay[1] = new Ray(torso.position, moveYRayDir[1]);
+        moveYRay[2] = new Ray(tailEnd.position, moveYRayDir[2]);
 
         for (int i = 0; i < moveYRay.Length; i++)
         {
-            if (Physics.Raycast(moveYRay[i], out moveYRayHit[i], 2 * maxFootDist, validFootPos))
+            if (Physics.Raycast(moveYRay[i], out moveYRayHit[i], 2 * maxFootDist, ~playerBody))
             {
                 rayHitCount++;
                 moveY += moveYRayHit[i].distance;
@@ -309,9 +312,12 @@ public class PlayerRagdollMovement : MonoBehaviour
 
             // targetController raycasts
             Gizmos.color = Color.magenta;
-            Debug.DrawRay(head.position, moveYRayDir.normalized * 2 * maxFootDist, Color.magenta);
-            Debug.DrawRay(torso.position, moveYRayDir.normalized * 2 * maxFootDist, Color.magenta);
-            Debug.DrawRay(tailEnd.position, moveYRayDir.normalized * 2 * maxFootDist, Color.magenta);
+            Gizmos.DrawSphere(head.position, 0.01f);
+            Debug.DrawRay(head.position, moveYRayDir[0].normalized * 2 * maxFootDist, Color.magenta);
+            Gizmos.DrawSphere(torso.position, 0.01f);
+            Debug.DrawRay(torso.position, moveYRayDir[1].normalized * 2 * maxFootDist, Color.magenta);
+            Gizmos.DrawSphere(tailEnd.position, 0.01f);
+            Debug.DrawRay(tailEnd.position, moveYRayDir[2].normalized * 2 * maxFootDist, Color.magenta);
 
             for (int i = 0; i < moveYRay.Length; i++)
             {
