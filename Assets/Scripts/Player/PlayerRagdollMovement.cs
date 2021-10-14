@@ -244,6 +244,10 @@ public class PlayerRagdollMovement : MonoBehaviour
                 rayHitCount++;
                 moveY += moveYRayHit[i].distance;
             }
+            else
+            {
+                Debug.Log(i);
+            }
         }
 
         if (rayHitCount > 0)
@@ -263,11 +267,13 @@ public class PlayerRagdollMovement : MonoBehaviour
 
         // ** Rotation **
         // Y rotation via mouse input
-        float rotateY = Input.GetAxis("Mouse X") * rotationSpeed;
+        float rotateY = Input.GetAxis("Mouse X") * rotationSpeed * 100 * Time.deltaTime;
 
         // X and Z rotation from average normal vector of raycasts
         Vector3 avgNormal = new Vector3(0, 0, 0);
         rayHitCount = 0;
+        float rotateX = 0;
+        float rotateZ = 0;
 
         for (int i = 0; i < target.Length; i++)
         {
@@ -278,10 +284,16 @@ public class PlayerRagdollMovement : MonoBehaviour
             }
         }
 
-        avgNormal /= rayHitCount;
+        if (rayHitCount != 0)
+        {
+            avgNormal /= rayHitCount;
+
+            rotateX = avgNormal.x - targetController.TransformDirection(0, 1, 0).x;
+            rotateZ = avgNormal.z - targetController.TransformDirection(0, 1, 0).z;
+        }
 
         // Apply rotation
-        Vector3 rotate = new Vector3(0, rotateY, 0);
+        Vector3 rotate = new Vector3(rotateX, rotateY, rotateZ);
         targetController.Rotate(rotate);
 
         // -- DEBUGGING --
