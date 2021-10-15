@@ -65,9 +65,10 @@ public class PlayerRagdollMovement : MonoBehaviour
 
     // animation variables
     bool[] footMoving;
+    bool[] footIdle;
     float[] lerp;
-    Vector3[] oldPos;
-    Vector3[] newPos;
+    Vector3[] startPos;
+    Vector3[] endPos;
 
     // -- DEBUG VARIABLES --
     // -- DEBUG VARIABLES END --
@@ -114,9 +115,10 @@ public class PlayerRagdollMovement : MonoBehaviour
 
         // animation variables
         footMoving = new bool[target.Length];
+        footIdle = new bool[target.Length];
         lerp = new float[target.Length];
-        oldPos = new Vector3[target.Length];
-        newPos = new Vector3[target.Length];
+        startPos = new Vector3[target.Length];
+        endPos = new Vector3[target.Length];
 
         // -- DEBUG INIT --
         // -- DEBUG INIT END --
@@ -125,6 +127,36 @@ public class PlayerRagdollMovement : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // ---------- Handle Player Input and movement ----------
+        // ** Movement **
+        // get X Z plane movement
+        float moveX = Input.GetAxis("Horizontal") * movementSpeed;
+        float moveZ = Input.GetAxis("Vertical") * movementSpeed;
+
+        // get Y movement
+        float moveY = 0;
+        // TODO
+
+        // Apply transforms
+        Vector3 movement = new Vector3(moveX, moveY, moveZ) * Time.deltaTime;
+        targetController.Translate(movement);
+
+        // ** Rotation **
+        // Y rotation via mouse input
+        float rotateY = Input.GetAxis("Mouse X") * rotationSpeed * 100 * Time.deltaTime;
+
+        // X and Z rotation from average normal vector of raycasts
+        Vector3 avgNormal = new Vector3(0, 0, 0);
+        float rotateX = 0;
+        float rotateZ = 0;
+        // TODO
+
+        // Apply rotation
+        Vector3 rotate = new Vector3(rotateX, rotateY, rotateZ);
+        targetController.Rotate(rotate);
+
+
+
         // ---------- Calculate leg positions / animations ----------
         // ** Update newValidPos, determine which feet need to move and count feet currently moving **
         List<int> stepNeededIndex = new List<int>();
@@ -134,19 +166,6 @@ public class PlayerRagdollMovement : MonoBehaviour
         {
             // Update idealPos
             idealPos[i] = targetController.position + targetController.TransformDirection(idealPosOffset[i]);
-
-            // Raycasts to detect new Position
-            rayDirection[i] = targetController.TransformDirection(0, -1, 0);
-
-            rayOrigin[i] = idealPos[i] - maxFootDist * rayDirection[i];
-
-            Ray ray = new Ray(rayOrigin[i], rayDirection[i]);
-            newPosAvailable[i] = Physics.Raycast(ray, out rayHit[i], 2 * maxFootDist, validFootPos);
-
-            if (newPosAvailable[i])
-            {
-                newValidPos[i] = rayHit[i].point;
-            }
 
             // Update if foot needs to step
             idealPosDist[i] = Vector3.Distance(currentPos[i], idealPos[i]);
@@ -180,18 +199,18 @@ public class PlayerRagdollMovement : MonoBehaviour
             stepAllowedIndex = stepNeededIndex;
         }
 
-        // ** Start foot movement (animation or ragdoll) **
+        // ** Initialize new foot movement **
         foreach (int i in stepAllowedIndex)
         {
-            // Start animation if newPosAvailable
-            if (newPosAvailable[i])
-            {
-                // set oldPos, newPos, lerp (linear interpolation), and the state of moving
-                oldPos[i] = currentPos[i];
-                newPos[i] = newValidPos[i];
-                lerp[i] = 0;
-                footMoving[i] = true;
-            }
+            // Calculate starting position on Sphere (maxfootDist in direction of currentpos)
+            startPos[i] = idealPos[i] + (currentPos[i] - idealPos[i]).normalized * maxFootDist;
+            currentPos[i] = startPos[i]; //?
+
+            // Calculate ideal end position on Sphere (maxfootDist in movement direction)
+            endPos[i] = idealPos[i] + targetController.TransformDirection(movement.x, 0, movement.y).normalized * maxFootDist;
+
+            footMoving[i] = true;
+            lerp[i] = 0;
         }
 
         // ** Update currentPos and move feet to currentPos **
@@ -199,7 +218,21 @@ public class PlayerRagdollMovement : MonoBehaviour
         {
             if (footMoving[i])
             {
-                // Update currentPos
+                // Calculate end position for next frame (imitate circle by moving y and z along sin wave)
+                Vector3 newPos = currentPos[i];
+                newPos += targetController.TransformDirection(0, Mathf.Sin(lerp[i] * 2 * Mathf.PI) * maxFootDist, Mathf.Sin(lerp[i] * Mathf.PI) * maxFootDist);
+
+                // ABOVE IS WRONG
+                // TODO:
+                // -Find radius / diameter of circle on sphere that connects startPos and endPos
+                // -Move along that circle each frame until full circle completed or something is hit => stick leg to it
+
+
+                // BELOW IS OLD
+
+
+
+                // new currentPos: moving along a circle with r=maxFootDist
                 currentPos[i] = Vector3.Lerp(oldPos[i], newPos[i], lerp[i]);
                 currentPos[i] += targetController.TransformDirection(new Vector3(0, Mathf.Sin(lerp[i] * Mathf.PI) * stepHeight, 0));
 
@@ -215,86 +248,6 @@ public class PlayerRagdollMovement : MonoBehaviour
 
             target[i].position = currentPos[i];
         }
-
-
-        // ---------- Move & rotate IK Controller / player ----------
-        // ** Movement **
-        // get X Z plane movement
-        float moveX = Input.GetAxis("Horizontal") * movementSpeed;
-        float moveZ = Input.GetAxis("Vertical") * movementSpeed;
-
-        // get Y movement, avg of raycast from head, torso, tailEnd
-        float moveY = 0;
-        int rayHitCount = 0;
-
-        moveYRayDir[0] = targetController.TransformDirection(0, -1, 0) + targetController.TransformDirection(0, 0, 1);
-        moveYRayDir[0].Normalize();
-        moveYRayDir[1] = targetController.TransformDirection(0, -1, 0);
-        moveYRayDir[2] = targetController.TransformDirection(0, -1, 0) + targetController.TransformDirection(0, 0, -1);
-        moveYRayDir[2].Normalize();
-
-        moveYRay[0] = new Ray(head.position, moveYRayDir[0]);
-        moveYRay[1] = new Ray(torso.position, moveYRayDir[1]);
-        moveYRay[2] = new Ray(tailEnd.position, moveYRayDir[2]);
-
-        for (int i = 0; i < moveYRay.Length; i++)
-        {
-            if (Physics.Raycast(moveYRay[i], out moveYRayHit[i], 2 * maxFootDist, ~playerBody))
-            {
-                rayHitCount++;
-                moveY += moveYRayHit[i].distance;
-            }
-            else
-            {
-                Debug.Log(i);
-            }
-        }
-
-        if (rayHitCount > 0)
-        {
-            moveY /= rayHitCount;
-            moveY -= maxFootDist;
-            moveY -= targetController.position.y;
-        }
-        else
-        {
-            moveY = 0;
-        }
-
-        // Apply transforms
-        Vector3 movement = new Vector3(moveX, moveY, moveZ) * Time.deltaTime;
-        targetController.Translate(movement);
-
-        // ** Rotation **
-        // Y rotation via mouse input
-        float rotateY = Input.GetAxis("Mouse X") * rotationSpeed * 100 * Time.deltaTime;
-
-        // X and Z rotation from average normal vector of raycasts
-        Vector3 avgNormal = new Vector3(0, 0, 0);
-        rayHitCount = 0;
-        float rotateX = 0;
-        float rotateZ = 0;
-
-        for (int i = 0; i < target.Length; i++)
-        {
-            if (newPosAvailable[i])
-            {
-                rayHitCount++;
-                avgNormal += rayHit[i].normal;
-            }
-        }
-
-        if (rayHitCount != 0)
-        {
-            avgNormal /= rayHitCount;
-
-            rotateX = avgNormal.x - targetController.TransformDirection(0, 1, 0).x;
-            rotateZ = avgNormal.z - targetController.TransformDirection(0, 1, 0).z;
-        }
-
-        // Apply rotation
-        Vector3 rotate = new Vector3(rotateX, rotateY, rotateZ);
-        targetController.Rotate(rotate);
 
         // -- DEBUGGING --
 
