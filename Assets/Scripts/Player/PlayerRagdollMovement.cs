@@ -69,6 +69,10 @@ public class PlayerRagdollMovement : MonoBehaviour
     float[] lerp;
     Vector3[] startPos;
     Vector3[] endPos;
+    Vector3[] newPos;
+    Vector3[] oldPos;
+    Vector3[] circleCenter;
+    float[] circleRadius;
 
     // -- DEBUG VARIABLES --
     // -- DEBUG VARIABLES END --
@@ -119,6 +123,10 @@ public class PlayerRagdollMovement : MonoBehaviour
         lerp = new float[target.Length];
         startPos = new Vector3[target.Length];
         endPos = new Vector3[target.Length];
+        newPos = new Vector3[target.Length];
+        oldPos = new Vector3[target.Length];
+        circleCenter = new Vector3[target.Length];
+        circleRadius = new float[target.Length];
 
         // -- DEBUG INIT --
         // -- DEBUG INIT END --
@@ -202,15 +210,28 @@ public class PlayerRagdollMovement : MonoBehaviour
         // ** Initialize new foot movement **
         foreach (int i in stepAllowedIndex)
         {
-            // Calculate starting position on Sphere (maxfootDist in direction of currentpos)
-            startPos[i] = idealPos[i] + (currentPos[i] - idealPos[i]).normalized * maxFootDist;
-            currentPos[i] = startPos[i]; //?
-
-            // Calculate ideal end position on Sphere (maxfootDist in movement direction)
-            endPos[i] = idealPos[i] + targetController.TransformDirection(movement.x, 0, movement.y).normalized * maxFootDist;
-
+            // Animation variables
             footMoving[i] = true;
             lerp[i] = 0;
+
+            // Calculate starting position on Sphere (maxfootDist in direction of currentpos)
+            startPos[i] = idealPos[i] + (currentPos[i] - idealPos[i]).normalized * maxFootDist;
+            //currentPos[i] = startPos[i]; //?
+
+            // Calculate ideal end position on Sphere (maxfootDist in movement direction)
+            endPos[i] = idealPos[i] + targetController.TransformDirection(movement.x, 0, movement.z).normalized * maxFootDist;
+
+            Debug.Log(Vector3.Distance(endPos[i], idealPos[i]));
+
+            newPos[i] = startPos[i];
+            oldPos[i] = startPos[i];
+
+            // Get the circles center and radius: Plane through start & endPos with the normal facing to idealPos
+            Vector3 normal = Vector3.Cross(startPos[i] - endPos[i], targetController.TransformDirection(0, 1, 0));
+            Plane plane = new Plane(normal, startPos[i]);
+
+            circleCenter[i] = plane.ClosestPointOnPlane(idealPos[i]);
+            circleRadius[i] = (circleCenter[i] - startPos[i]).magnitude;
         }
 
         // ** Update currentPos and move feet to currentPos **
@@ -218,28 +239,29 @@ public class PlayerRagdollMovement : MonoBehaviour
         {
             if (footMoving[i])
             {
-                // Calculate end position for next frame (imitate circle by moving y and z along sin wave)
-                Vector3 newPos = currentPos[i];
-                newPos += targetController.TransformDirection(0, Mathf.Sin(lerp[i] * 2 * Mathf.PI) * maxFootDist, Mathf.Sin(lerp[i] * Mathf.PI) * maxFootDist);
+                // Calculate newPos for next frame: sin in up direction, cos in movement direction
+                newPos[i] = startPos[i];
 
-                // ABOVE IS WRONG
-                // TODO:
-                // -Find radius / diameter of circle on sphere that connects startPos and endPos
-                // -Move along that circle each frame until full circle completed or something is hit => stick leg to it
+                newPos[i] += stepHeight * Mathf.Sin(lerp[i] * 2 * Mathf.PI) * targetController.TransformDirection(0, 1, 0);
+                newPos[i] += circleRadius[i] * Mathf.Cos(lerp[i] * 2 * Mathf.PI) * (startPos[i] - endPos[i]).normalized;
 
-
-                // BELOW IS OLD
+                // Raycast from oldPos to newPos to detect if foot hit a valid position
+                Ray ray = new Ray(oldPos[i], newPos[i] - oldPos[i]);
+                RaycastHit info = new RaycastHit();
 
 
+                if (Physics.Raycast(ray, out info, (newPos[i] - oldPos[i]).magnitude, validFootPos))
+                {
+                    currentPos[i] = info.point;
+                    footMoving[i] = false;
+                }
+                else
+                {
+                    lerp[i] += Time.deltaTime * animationSpeed;
+                    oldPos[i] = newPos[i];
+                    currentPos[i] = newPos[i];
+                }
 
-                // new currentPos: moving along a circle with r=maxFootDist
-                currentPos[i] = Vector3.Lerp(oldPos[i], newPos[i], lerp[i]);
-                currentPos[i] += targetController.TransformDirection(new Vector3(0, Mathf.Sin(lerp[i] * Mathf.PI) * stepHeight, 0));
-
-                // increment lerp
-                lerp[i] += Time.deltaTime * animationSpeed;
-
-                // Check if step ended
                 if (lerp[i] >= 1)
                 {
                     footMoving[i] = false;
@@ -273,6 +295,14 @@ public class PlayerRagdollMovement : MonoBehaviour
                 // leg validpos
                 Gizmos.color = Color.green;
                 Gizmos.DrawWireSphere(idealPos[i], maxFootDist);
+
+                // circle
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawWireSphere(circleCenter[i], circleRadius[i]);
+
+                // Debug
+                Gizmos.DrawSphere(startPos[i], 0.01f);
+                Gizmos.DrawSphere(endPos[i], 0.01f);
             }
 
             // targetController raycasts
